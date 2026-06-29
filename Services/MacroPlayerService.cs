@@ -5,14 +5,15 @@ namespace AutoClicker.Services;
 
 public class MacroPlayerService
 {
-  public async Task PlayAsync(Macro macro, CancellationToken ct)
+  public async Task<int> PlayAsync(Macro macro, CancellationToken ct)
   {
     int vLeft   = NativeMethods.GetSystemMetrics(NativeMethods.SM_XVIRTUALSCREEN);
     int vTop    = NativeMethods.GetSystemMetrics(NativeMethods.SM_YVIRTUALSCREEN);
     int vWidth  = NativeMethods.GetSystemMetrics(NativeMethods.SM_CXVIRTUALSCREEN);
     int vHeight = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYVIRTUALSCREEN);
 
-    int totalRuns = macro.RepeatCount == 0 ? int.MaxValue : macro.RepeatCount;
+    int totalRuns   = macro.RepeatCount == 0 ? int.MaxValue : macro.RepeatCount;
+    int completedRuns = 0;
 
     for (int run = 0; run < totalRuns && !ct.IsCancellationRequested; run++)
     {
@@ -29,7 +30,10 @@ public class MacroPlayerService
 
         SendClick(evt.Button, evt.ClickType, nx, ny);
       }
+      completedRuns++;
     }
+
+    return completedRuns;
   }
 
   private static void SendClick(Models.MouseButton button, ClickType type, int nx, int ny)

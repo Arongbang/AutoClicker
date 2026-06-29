@@ -109,19 +109,17 @@ public class MainViewModel : INotifyPropertyChanged
   public ICommand StopCommand    { get; }
   public ICommand PlayCommand    { get; }
   public ICommand NewMacroCommand  { get; }
-  public ICommand SaveCommand    { get; }
   public ICommand DeleteCommand  { get; }
   public ICommand ToggleRecordCommand { get; }
   public ICommand TogglePlayCommand   { get; }
 
   public MainViewModel()
   {
-    RecordCommand  = new RelayCommand(_ => StartRecording(),  _ => _state == AppState.Idle && _selectedMacro != null);
-    StopCommand    = new RelayCommand(_ => Stop(removeLastEvent: true), _ => _state != AppState.Idle);
-    PlayCommand    = new AsyncRelayCommand(_ => StartPlayingAsync(), _ => _state == AppState.Idle && _selectedMacro?.Events.Count > 0);
-    NewMacroCommand  = new RelayCommand(_ => CreateNewMacro(), _ => _state == AppState.Idle);
-    SaveCommand    = new AsyncRelayCommand(_ => SaveAsync(),   _ => _selectedMacro != null);
-    DeleteCommand  = new RelayCommand(_ => DeleteSelected(),   _ => _state == AppState.Idle && _selectedMacro != null);
+    RecordCommand   = new RelayCommand(_ => StartRecording(),  _ => _state == AppState.Idle && _selectedMacro != null);
+    StopCommand     = new RelayCommand(_ => Stop(removeLastEvent: true), _ => _state != AppState.Idle);
+    PlayCommand     = new AsyncRelayCommand(_ => StartPlayingAsync(), _ => _state == AppState.Idle && _selectedMacro?.Events.Count > 0);
+    NewMacroCommand = new RelayCommand(_ => CreateNewMacro(), _ => _state == AppState.Idle);
+    DeleteCommand   = new RelayCommand(_ => DeleteSelected(),   _ => _state == AppState.Idle && _selectedMacro != null);
 
     ToggleRecordCommand = new RelayCommand(_ =>
     {
@@ -178,7 +176,10 @@ public class MainViewModel : INotifyPropertyChanged
         if (CurrentEvents.Count > 0)
           CurrentEvents.RemoveAt(CurrentEvents.Count - 1);
       }
-      StatusText = $"녹화 완료 — {CurrentEvents.Count}개 이벤트";
+      int count = CurrentEvents.Count;
+      SetState(AppState.Idle);
+      _ = SaveAfterRecordingAsync(count);
+      return;
     }
     else if (_state == AppState.Playing)
     {
@@ -186,6 +187,12 @@ public class MainViewModel : INotifyPropertyChanged
       StatusText = "재생 중단됨";
     }
     SetState(AppState.Idle);
+  }
+
+  private async Task SaveAfterRecordingAsync(int eventCount)
+  {
+    await _storageService.SaveAsync(Macros);
+    StatusText = $"녹화 완료 — {eventCount}개 이벤트 (자동 저장됨)";
   }
 
   private async Task StartPlayingAsync()
@@ -202,8 +209,10 @@ public class MainViewModel : INotifyPropertyChanged
     _playCts = new CancellationTokenSource();
     try
     {
-      await _playerService.PlayAsync(_selectedMacro, _playCts.Token);
+      int completedRuns = await _playerService.PlayAsync(_selectedMacro, _playCts.Token);
       StatusText = "재생 완료";
+      MessageBox.Show($"{completedRuns}번 반복 완료했습니다.", "재생 완료",
+        MessageBoxButton.OK, MessageBoxImage.Information);
     }
     catch (OperationCanceledException)
     {
@@ -277,7 +286,6 @@ public class MainViewModel : INotifyPropertyChanged
     ((RelayCommand)StopCommand).RaiseCanExecuteChanged();
     ((AsyncRelayCommand)PlayCommand).RaiseCanExecuteChanged();
     ((RelayCommand)NewMacroCommand).RaiseCanExecuteChanged();
-    ((AsyncRelayCommand)SaveCommand).RaiseCanExecuteChanged();
     ((RelayCommand)DeleteCommand).RaiseCanExecuteChanged();
   }
 
