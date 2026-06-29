@@ -117,7 +117,7 @@ public class MainViewModel : INotifyPropertyChanged
   public MainViewModel()
   {
     RecordCommand  = new RelayCommand(_ => StartRecording(),  _ => _state == AppState.Idle && _selectedMacro != null);
-    StopCommand    = new RelayCommand(_ => Stop(),             _ => _state != AppState.Idle);
+    StopCommand    = new RelayCommand(_ => Stop(removeLastEvent: true), _ => _state != AppState.Idle);
     PlayCommand    = new AsyncRelayCommand(_ => StartPlayingAsync(), _ => _state == AppState.Idle && _selectedMacro?.Events.Count > 0);
     NewMacroCommand  = new RelayCommand(_ => CreateNewMacro(), _ => _state == AppState.Idle);
     SaveCommand    = new AsyncRelayCommand(_ => SaveAsync(),   _ => _selectedMacro != null);
@@ -166,11 +166,18 @@ public class MainViewModel : INotifyPropertyChanged
     _hookService.StartRecording();
   }
 
-  private void Stop()
+  private void Stop(bool removeLastEvent = false)
   {
     if (_state == AppState.Recording)
     {
       _hookService.StopRecording();
+      // 버튼 클릭으로 정지한 경우 마지막 이벤트(정지 버튼 클릭)를 제거
+      if (removeLastEvent && _selectedMacro != null && _selectedMacro.Events.Count > 0)
+      {
+        _selectedMacro.Events.RemoveAt(_selectedMacro.Events.Count - 1);
+        if (CurrentEvents.Count > 0)
+          CurrentEvents.RemoveAt(CurrentEvents.Count - 1);
+      }
       StatusText = $"녹화 완료 — {CurrentEvents.Count}개 이벤트";
     }
     else if (_state == AppState.Playing)
