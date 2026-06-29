@@ -42,6 +42,7 @@ public class MainViewModel : INotifyPropertyChanged
   public ObservableCollection<Macro>        Macros        { get; } = new();
   public ObservableCollection<MacroEventRow> CurrentEvents { get; } = new();
 
+  private readonly List<Macro> _selectedMacros = new();
   private Macro? _selectedMacro;
   public Macro? SelectedMacro
   {
@@ -119,7 +120,7 @@ public class MainViewModel : INotifyPropertyChanged
     StopCommand     = new RelayCommand(_ => Stop(removeLastEvent: true), _ => _state != AppState.Idle);
     PlayCommand     = new AsyncRelayCommand(_ => StartPlayingAsync(), _ => _state == AppState.Idle && _selectedMacro?.Events.Count > 0);
     NewMacroCommand = new RelayCommand(_ => CreateNewMacro(), _ => _state == AppState.Idle);
-    DeleteCommand   = new RelayCommand(_ => DeleteSelected(),   _ => _state == AppState.Idle && _selectedMacro != null);
+    DeleteCommand   = new RelayCommand(_ => DeleteSelected(),   _ => _state == AppState.Idle && _selectedMacros.Count > 0);
 
     ToggleRecordCommand = new RelayCommand(_ =>
     {
@@ -232,10 +233,20 @@ public class MainViewModel : INotifyPropertyChanged
     StatusText = "저장 완료";
   }
 
+  public void SetSelectedMacros(IEnumerable<Macro> items)
+  {
+    if (_state != AppState.Idle) return;
+    _selectedMacros.Clear();
+    _selectedMacros.AddRange(items);
+    RaiseAllCommands();
+  }
+
   private void DeleteSelected()
   {
-    if (_selectedMacro == null) return;
-    Macros.Remove(_selectedMacro);
+    if (_selectedMacros.Count == 0) return;
+    var toDelete = _selectedMacros.ToList();
+    foreach (var m in toDelete)
+      Macros.Remove(m);
     SelectedMacro = Macros.Count > 0 ? Macros[0] : null;
     _ = SaveAsync();
   }

@@ -1,5 +1,8 @@
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
+using AutoClicker.Models;
 using AutoClicker.Services;
 using AutoClicker.ViewModels;
 
@@ -45,6 +48,12 @@ public partial class MainWindow : Window
       }
     }
     return IntPtr.Zero;
+  }
+
+  private void MacroListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+  {
+    if (DataContext is MainViewModel vm && sender is ListBox lb)
+      vm.SetSelectedMacros(lb.SelectedItems.Cast<Macro>());
   }
 
   protected override void OnClosed(EventArgs e)

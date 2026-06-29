@@ -41,9 +41,12 @@
             <Button Content="+ 새 매크로" Command="{Binding NewMacroCommand}" MinWidth="0" Padding="6,4"/>
             <Button Content="삭제"        Command="{Binding DeleteCommand}"   MinWidth="0" Padding="6,4"/>
           </StackPanel>
-          <ListBox ItemsSource="{Binding Macros}"
+          <ListBox x:Name="MacroListBox"
+                   ItemsSource="{Binding Macros}"
                    SelectedItem="{Binding SelectedMacro}"
+                   SelectionMode="Extended"
                    DisplayMemberPath="Name"
+                   SelectionChanged="MacroListBox_SelectionChanged"
                    ScrollViewer.VerticalScrollBarVisibility="Auto"/>
         </DockPanel>
       </GroupBox>
