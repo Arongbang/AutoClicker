@@ -55,6 +55,7 @@ public class MainViewModel : INotifyPropertyChanged
       OnPropertyChanged(nameof(RepeatCountText));
       OnPropertyChanged(nameof(IsInfiniteRepeat));
       RefreshEventList();
+      RaiseAllCommands();
     }
   }
 
