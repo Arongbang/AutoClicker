@@ -53,7 +53,11 @@ public partial class MainWindow : Window
   private void MacroListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
   {
     if (DataContext is MainViewModel vm && sender is ListBox lb)
+    {
       vm.SetSelectedMacros(lb.SelectedItems.Cast<Macro>());
+      if (lb.SelectedItems.Count == 1)
+        vm.SelectedMacro = (Macro)lb.SelectedItems[0]!;
+    }
   }
 
   protected override void OnClosed(EventArgs e)

@@ -146,6 +146,7 @@ public class MainViewModel : INotifyPropertyChanged
     Macros.Clear();
     foreach (var m in list) Macros.Add(m);
     if (Macros.Count > 0) SelectedMacro = Macros[0];
+    else CreateNewMacro();
   }
 
   private void CreateNewMacro()
