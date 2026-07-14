@@ -21,7 +21,7 @@ public class MacroStorageService
   {
     Directory.CreateDirectory(Dir);
     await System.IO.File.WriteAllTextAsync(File,
-      JsonSerializer.Serialize(macros.ToList(), Opts));
+      JsonSerializer.Serialize(macros.ToList(), Opts)).ConfigureAwait(false);
   }
 
   public async Task<List<Macro>> LoadAsync()
@@ -29,7 +29,7 @@ public class MacroStorageService
     if (!System.IO.File.Exists(File)) return new List<Macro>();
     try
     {
-      var json = await System.IO.File.ReadAllTextAsync(File);
+      var json = await System.IO.File.ReadAllTextAsync(File).ConfigureAwait(false);
       return JsonSerializer.Deserialize<List<Macro>>(json, Opts) ?? new List<Macro>();
     }
     catch
