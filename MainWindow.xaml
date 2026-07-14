@@ -38,8 +38,9 @@
       <GroupBox Grid.Column="0" Header="저장된 매크로">
         <DockPanel>
           <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
-            <Button Content="+ 새 매크로" Command="{Binding NewMacroCommand}" MinWidth="0" Padding="6,4"/>
-            <Button Content="삭제"        Command="{Binding DeleteCommand}"   MinWidth="0" Padding="6,4"/>
+            <Button Content="+ 새 매크로" Command="{Binding NewMacroCommand}"  MinWidth="0" Padding="6,4"/>
+            <Button Content="복사"        Command="{Binding DuplicateCommand}" MinWidth="0" Padding="6,4"/>
+            <Button Content="삭제"        Command="{Binding DeleteCommand}"    MinWidth="0" Padding="6,4"/>
           </StackPanel>
           <ListBox x:Name="MacroListBox"
                    ItemsSource="{Binding Macros}"
@@ -102,7 +103,8 @@
           <GroupBox Header="기록된 이벤트">
             <DataGrid ItemsSource="{Binding CurrentEvents}"
                       AutoGenerateColumns="False"
-                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
                       CanUserSortColumns="False"
                       CanUserResizeRows="False"
                       GridLinesVisibility="Horizontal"
@@ -110,11 +112,11 @@
                       SelectionMode="Single"
                       ScrollViewer.VerticalScrollBarVisibility="Auto">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="#"    Binding="{Binding Number}" Width="40"/>
-                <DataGridTextColumn Header="종류" Binding="{Binding Kind}"   Width="110"/>
-                <DataGridTextColumn Header="X"    Binding="{Binding X}"      Width="65"/>
-                <DataGridTextColumn Header="Y"    Binding="{Binding Y}"      Width="65"/>
-                <DataGridTextColumn Header="지연" Binding="{Binding Delay}"  Width="80"/>
+                <DataGridTextColumn Header="#"        Binding="{Binding Number}" Width="40"  IsReadOnly="True"/>
+                <DataGridTextColumn Header="종류"     Binding="{Binding Kind}"   Width="110" IsReadOnly="True"/>
+                <DataGridTextColumn Header="X"        Binding="{Binding X}"      Width="65"  IsReadOnly="True"/>
+                <DataGridTextColumn Header="Y"        Binding="{Binding Y}"      Width="65"  IsReadOnly="True"/>
+                <DataGridTextColumn Header="지연(ms)" Binding="{Binding Delay}"  Width="80"/>
               </DataGrid.Columns>
             </DataGrid>
           </GroupBox>

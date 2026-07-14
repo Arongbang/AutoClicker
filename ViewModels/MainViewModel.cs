@@ -8,24 +8,38 @@ using AutoClicker.Services;
 
 namespace AutoClicker.ViewModels;
 
-public class MacroEventRow
+public class MacroEventRow : INotifyPropertyChanged
 {
+  private readonly MacroEvent _source;
+
   public int    Number { get; }
   public string Kind   { get; }
   public int    X      { get; }
   public int    Y      { get; }
-  public string Delay  { get; }
+
+  public long Delay
+  {
+    get => _source.DelayMs;
+    set
+    {
+      if (value < 0) return;
+      _source.DelayMs = value;
+      OnPropertyChanged();
+    }
+  }
 
   public MacroEventRow(MacroEvent e, int number)
   {
-    Number = number;
-    Kind   = $"{e.Button} {(e.ClickType == ClickType.Double ? "더블클릭" : "클릭")}";
-    X      = e.X;
-    Y      = e.Y;
-    Delay  = e.DelayMs >= 1000
-      ? $"{e.DelayMs / 1000.0:F1}s"
-      : $"{e.DelayMs}ms";
+    _source = e;
+    Number  = number;
+    Kind    = $"{e.Button} {(e.ClickType == ClickType.Double ? "더블클릭" : "클릭")}";
+    X       = e.X;
+    Y       = e.Y;
   }
+
+  public event PropertyChangedEventHandler? PropertyChanged;
+  private void OnPropertyChanged([CallerMemberName] string? n = null) =>
+    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }
 
 public enum AppState { Idle, Recording, Playing }
@@ -68,6 +82,7 @@ public class MainViewModel : INotifyPropertyChanged
       if (_selectedMacro == null) return;
       _selectedMacro.Name = value;  // Macro.INotifyPropertyChanged가 ListBox를 자동 갱신
       OnPropertyChanged();
+      _ = SaveAsync();
     }
   }
 
@@ -78,7 +93,10 @@ public class MainViewModel : INotifyPropertyChanged
     {
       if (_selectedMacro == null) return;
       if (int.TryParse(value, out int n) && n >= 1)
+      {
         _selectedMacro.RepeatCount = n;
+        _ = SaveAsync();
+      }
       OnPropertyChanged();
     }
   }
@@ -93,6 +111,7 @@ public class MainViewModel : INotifyPropertyChanged
       OnPropertyChanged();
       OnPropertyChanged(nameof(RepeatCountText));
       OnPropertyChanged(nameof(IsRepeatCountEnabled));
+      _ = SaveAsync();
     }
   }
 
@@ -111,6 +130,7 @@ public class MainViewModel : INotifyPropertyChanged
   public ICommand PlayCommand    { get; }
   public ICommand NewMacroCommand  { get; }
   public ICommand DeleteCommand  { get; }
+  public ICommand DuplicateCommand { get; }
   public ICommand ToggleRecordCommand { get; }
   public ICommand TogglePlayCommand   { get; }
 
@@ -121,6 +141,7 @@ public class MainViewModel : INotifyPropertyChanged
     PlayCommand     = new AsyncRelayCommand(_ => StartPlayingAsync(), _ => _state == AppState.Idle && _selectedMacro?.Events.Count > 0);
     NewMacroCommand = new RelayCommand(_ => CreateNewMacro(), _ => _state == AppState.Idle);
     DeleteCommand   = new RelayCommand(_ => DeleteSelected(),   _ => _state == AppState.Idle && _selectedMacros.Count > 0);
+    DuplicateCommand = new RelayCommand(_ => DuplicateSelected(), _ => _state == AppState.Idle && _selectedMacros.Count > 0);
 
     ToggleRecordCommand = new RelayCommand(_ =>
     {
@@ -154,6 +175,7 @@ public class MainViewModel : INotifyPropertyChanged
     var macro = new Macro { Name = $"매크로 {Macros.Count + 1}" };
     Macros.Add(macro);
     SelectedMacro = macro;
+    _ = SaveAsync();
   }
 
   private void StartRecording()
@@ -234,6 +256,9 @@ public class MainViewModel : INotifyPropertyChanged
     StatusText = "저장 완료";
   }
 
+  public void SaveOnExit() =>
+    _storageService.SaveAsync(Macros).GetAwaiter().GetResult();
+
   public void SetSelectedMacros(IEnumerable<Macro> items)
   {
     if (_state != AppState.Idle) return;
@@ -252,12 +277,44 @@ public class MainViewModel : INotifyPropertyChanged
     _ = SaveAsync();
   }
 
+  private void DuplicateSelected()
+  {
+    if (_selectedMacros.Count == 0) return;
+    Macro? last = null;
+    foreach (var m in _selectedMacros.ToList())
+    {
+      var copy = new Macro
+      {
+        Name        = $"{m.Name} (복사본)",
+        RepeatCount = m.RepeatCount,
+        Events      = m.Events.Select(e => new MacroEvent
+        {
+          Button = e.Button, ClickType = e.ClickType, X = e.X, Y = e.Y, DelayMs = e.DelayMs
+        }).ToList()
+      };
+      Macros.Add(copy);
+      last = copy;
+    }
+    if (last != null) SelectedMacro = last;
+    _ = SaveAsync();
+  }
+
+  private void AddEventRow(MacroEvent evt, int number)
+  {
+    var row = new MacroEventRow(evt, number);
+    row.PropertyChanged += (_, args) =>
+    {
+      if (args.PropertyName == nameof(MacroEventRow.Delay)) _ = SaveAsync();
+    };
+    CurrentEvents.Add(row);
+  }
+
   private void OnEventRecorded(MacroEvent evt)
   {
     Application.Current.Dispatcher.Invoke(() =>
     {
       _selectedMacro?.Events.Add(evt);
-      CurrentEvents.Add(new MacroEventRow(evt, CurrentEvents.Count + 1));
+      AddEventRow(evt, CurrentEvents.Count + 1);
     });
   }
 
@@ -268,9 +325,8 @@ public class MainViewModel : INotifyPropertyChanged
       if (_selectedMacro == null || _selectedMacro.Events.Count == 0) return;
       var last = _selectedMacro.Events[^1];
       last.ClickType = clickType;
-      var replaced = new MacroEventRow(last, CurrentEvents.Count);
       CurrentEvents.RemoveAt(CurrentEvents.Count - 1);
-      CurrentEvents.Add(replaced);
+      AddEventRow(last, CurrentEvents.Count + 1);
     });
   }
 
@@ -279,7 +335,7 @@ public class MainViewModel : INotifyPropertyChanged
     CurrentEvents.Clear();
     if (_selectedMacro == null) return;
     for (int i = 0; i < _selectedMacro.Events.Count; i++)
-      CurrentEvents.Add(new MacroEventRow(_selectedMacro.Events[i], i + 1));
+      AddEventRow(_selectedMacro.Events[i], i + 1);
   }
 
   private void SetState(AppState state)
@@ -299,6 +355,7 @@ public class MainViewModel : INotifyPropertyChanged
     ((AsyncRelayCommand)PlayCommand).RaiseCanExecuteChanged();
     ((RelayCommand)NewMacroCommand).RaiseCanExecuteChanged();
     ((RelayCommand)DeleteCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)DuplicateCommand).RaiseCanExecuteChanged();
   }
 
   public event PropertyChangedEventHandler? PropertyChanged;

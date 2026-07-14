@@ -62,6 +62,8 @@ public partial class MainWindow : Window
 
   protected override void OnClosed(EventArgs e)
   {
+    if (DataContext is MainViewModel vm) vm.SaveOnExit();
+
     var hwnd = new WindowInteropHelper(this).Handle;
     NativeMethods.UnregisterHotKey(hwnd, HOTKEY_RECORD);
     NativeMethods.UnregisterHotKey(hwnd, HOTKEY_PLAY);
