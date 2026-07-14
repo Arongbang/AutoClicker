@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 using AutoClicker.Models;
@@ -17,15 +19,47 @@ public class MacroEventRow : INotifyPropertyChanged
   public int    X      { get; }
   public int    Y      { get; }
 
-  public long Delay
+  public string Delay
   {
-    get => _source.DelayMs;
+    get => FormatDelay(_source.DelayMs);
     set
     {
-      if (value < 0) return;
-      _source.DelayMs = value;
+      if (!TryParseDelay(value, out var ms) || ms < 0) return;
+      _source.DelayMs = ms;
       OnPropertyChanged();
     }
+  }
+
+  // 지연시간을 가장 자연스러운 단위(h/m/s/ms)로 표시한다.
+  private static string FormatDelay(long ms)
+  {
+    if (ms != 0 && ms % 3_600_000 == 0) return $"{ms / 3_600_000}h";
+    if (ms != 0 && ms % 60_000    == 0) return $"{ms / 60_000}m";
+    if (ms != 0 && ms % 1_000     == 0) return $"{ms / 1_000}s";
+    return $"{ms}ms";
+  }
+
+  // "500", "500ms", "1.5s", "2m", "1h" 등 ms/s/m/h 단위 입력을 밀리초로 변환한다.
+  private static bool TryParseDelay(string? text, out long ms)
+  {
+    ms = 0;
+    if (string.IsNullOrWhiteSpace(text)) return false;
+
+    var match = Regex.Match(text.Trim(), @"^([0-9]*\.?[0-9]+)\s*(ms|s|m|h)?$", RegexOptions.IgnoreCase);
+    if (!match.Success) return false;
+    if (!double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+      return false;
+
+    var unitMs = match.Groups[2].Value.ToLowerInvariant() switch
+    {
+      "h" => 3_600_000d,
+      "m" => 60_000d,
+      "s" => 1_000d,
+      _   => 1d,
+    };
+
+    ms = (long)Math.Round(value * unitMs);
+    return true;
   }
 
   public MacroEventRow(MacroEvent e, int number)

@@ -116,7 +116,7 @@
                 <DataGridTextColumn Header="종류"     Binding="{Binding Kind}"   Width="110" IsReadOnly="True"/>
                 <DataGridTextColumn Header="X"        Binding="{Binding X}"      Width="65"  IsReadOnly="True"/>
                 <DataGridTextColumn Header="Y"        Binding="{Binding Y}"      Width="65"  IsReadOnly="True"/>
-                <DataGridTextColumn Header="지연(ms)" Binding="{Binding Delay}"  Width="80"/>
+                <DataGridTextColumn Header="지연" Binding="{Binding Delay}"  Width="80"/>
               </DataGrid.Columns>
             </DataGrid>
           </GroupBox>
