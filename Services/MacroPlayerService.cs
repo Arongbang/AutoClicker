@@ -5,7 +5,7 @@ namespace AutoClicker.Services;
 
 public class MacroPlayerService
 {
-  public async Task<int> PlayAsync(Macro macro, CancellationToken ct)
+  public async Task<int> PlayAsync(Macro macro, CancellationToken ct, IProgress<int>? progress = null)
   {
     int vLeft   = NativeMethods.GetSystemMetrics(NativeMethods.SM_XVIRTUALSCREEN);
     int vTop    = NativeMethods.GetSystemMetrics(NativeMethods.SM_YVIRTUALSCREEN);
@@ -17,6 +17,7 @@ public class MacroPlayerService
 
     for (int run = 0; run < totalRuns && !ct.IsCancellationRequested; run++)
     {
+      progress?.Report(run + 1);
       foreach (var evt in macro.Events)
       {
         ct.ThrowIfCancellationRequested();

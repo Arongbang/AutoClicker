@@ -103,6 +103,7 @@ public class MainViewModel : INotifyPropertyChanged
       OnPropertyChanged(nameof(MacroName));
       OnPropertyChanged(nameof(RepeatCountText));
       OnPropertyChanged(nameof(IsInfiniteRepeat));
+      OnPropertyChanged(nameof(EstimatedDurationText));
       RefreshEventList();
       RaiseAllCommands();
     }
@@ -150,6 +151,18 @@ public class MainViewModel : INotifyPropertyChanged
   }
 
   public bool IsRepeatCountEnabled => !IsInfiniteRepeat;
+
+  public string EstimatedDurationText =>
+    FormatDuration(_selectedMacro?.Events.Sum(e => e.DelayMs) ?? 0);
+
+  // 매크로 1회 실행 예상 소요시간을 사람이 읽기 쉬운 형태로 변환한다.
+  private static string FormatDuration(long ms)
+  {
+    var ts = TimeSpan.FromMilliseconds(ms);
+    if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m {ts.Seconds}s";
+    if (ts.TotalMinutes >= 1) return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+    return $"{ts.TotalSeconds:0.#}s";
+  }
 
   private string _statusText = "대기 중";
   public string StatusText
@@ -259,15 +272,19 @@ public class MainViewModel : INotifyPropertyChanged
     if (_state != AppState.Idle) return;
 
     SetState(AppState.Playing);
-    string repeatLabel = _selectedMacro.RepeatCount == 0
-      ? "무한 반복"
-      : $"{_selectedMacro.RepeatCount}회";
-    StatusText = $"재생 중... ({repeatLabel})";
+
+    void ReportProgress(int current)
+    {
+      string countLabel = _selectedMacro!.RepeatCount == 0 ? $"{current}/∞" : $"{current}/{_selectedMacro.RepeatCount}";
+      StatusText = $"재생 중... ({countLabel})";
+    }
+    ReportProgress(1);
+    var progress = new Progress<int>(ReportProgress);
 
     _playCts = new CancellationTokenSource();
     try
     {
-      int completedRuns = await _playerService.PlayAsync(_selectedMacro, _playCts.Token);
+      int completedRuns = await _playerService.PlayAsync(_selectedMacro, _playCts.Token, progress);
       StatusText = "재생 완료";
       MessageBox.Show($"{completedRuns}번 반복 완료했습니다.", "재생 완료",
         MessageBoxButton.OK, MessageBoxImage.Information);
@@ -338,7 +355,11 @@ public class MainViewModel : INotifyPropertyChanged
     var row = new MacroEventRow(evt, number);
     row.PropertyChanged += (_, args) =>
     {
-      if (args.PropertyName == nameof(MacroEventRow.Delay)) _ = SaveAsync();
+      if (args.PropertyName == nameof(MacroEventRow.Delay))
+      {
+        OnPropertyChanged(nameof(EstimatedDurationText));
+        _ = SaveAsync();
+      }
     };
     CurrentEvents.Add(row);
   }
@@ -349,6 +370,7 @@ public class MainViewModel : INotifyPropertyChanged
     {
       _selectedMacro?.Events.Add(evt);
       AddEventRow(evt, CurrentEvents.Count + 1);
+      OnPropertyChanged(nameof(EstimatedDurationText));
     });
   }
 
