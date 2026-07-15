@@ -199,6 +199,8 @@ public class MainViewModel : INotifyPropertyChanged
   public ICommand NewMacroCommand  { get; }
   public ICommand DeleteCommand  { get; }
   public ICommand DuplicateCommand { get; }
+  public ICommand MoveMacroUpCommand   { get; }
+  public ICommand MoveMacroDownCommand { get; }
   public ICommand ToggleRecordCommand { get; }
   public ICommand TogglePlayCommand   { get; }
 
@@ -210,6 +212,8 @@ public class MainViewModel : INotifyPropertyChanged
     NewMacroCommand = new RelayCommand(_ => CreateNewMacro(), _ => _state == AppState.Idle);
     DeleteCommand   = new RelayCommand(_ => DeleteSelected(),   _ => _state == AppState.Idle && _selectedMacros.Count > 0);
     DuplicateCommand = new RelayCommand(_ => DuplicateSelected(), _ => _state == AppState.Idle && _selectedMacros.Count > 0);
+    MoveMacroUpCommand   = new RelayCommand(_ => MoveMacro(-1), _ => _state == AppState.Idle && _selectedMacro != null && Macros.IndexOf(_selectedMacro) > 0);
+    MoveMacroDownCommand = new RelayCommand(_ => MoveMacro(1),  _ => _state == AppState.Idle && _selectedMacro != null && Macros.IndexOf(_selectedMacro) >= 0 && Macros.IndexOf(_selectedMacro) < Macros.Count - 1);
 
     ToggleRecordCommand = new RelayCommand(_ =>
     {
@@ -361,6 +365,18 @@ public class MainViewModel : INotifyPropertyChanged
     _ = SaveAsync();
   }
 
+  // 선택된 매크로를 목록에서 한 칸 위(-1) 또는 아래(1)로 이동한다.
+  private void MoveMacro(int offset)
+  {
+    if (_selectedMacro == null) return;
+    int idx = Macros.IndexOf(_selectedMacro);
+    int newIdx = idx + offset;
+    if (idx < 0 || newIdx < 0 || newIdx >= Macros.Count) return;
+    Macros.Move(idx, newIdx);
+    RaiseAllCommands();
+    _ = SaveAsync();
+  }
+
   private void DuplicateSelected()
   {
     if (_selectedMacros.Count == 0) return;
@@ -445,6 +461,8 @@ public class MainViewModel : INotifyPropertyChanged
     ((RelayCommand)NewMacroCommand).RaiseCanExecuteChanged();
     ((RelayCommand)DeleteCommand).RaiseCanExecuteChanged();
     ((RelayCommand)DuplicateCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)MoveMacroUpCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)MoveMacroDownCommand).RaiseCanExecuteChanged();
   }
 
   public event PropertyChangedEventHandler? PropertyChanged;
