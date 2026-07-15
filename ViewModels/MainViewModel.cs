@@ -164,12 +164,33 @@ public class MainViewModel : INotifyPropertyChanged
     return $"{ts.TotalSeconds:0.#}s";
   }
 
+  // 재생 중 매크로 1회당 남은 시간을 1초 단위로 표시한다.
+  private static string FormatRemaining(long ms)
+  {
+    long totalSeconds = (long)Math.Ceiling(ms / 1000.0);
+    var ts = TimeSpan.FromSeconds(totalSeconds);
+    if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m {ts.Seconds}s";
+    if (ts.TotalMinutes >= 1) return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+    return $"{ts.Seconds}s";
+  }
+
   private string _statusText = "대기 중";
   public string StatusText
   {
     get => _statusText;
     private set { _statusText = value; OnPropertyChanged(); }
   }
+
+  private string _remainingTimeText = "";
+  public string RemainingTimeText
+  {
+    get => _remainingTimeText;
+    private set { _remainingTimeText = value; OnPropertyChanged(); }
+  }
+
+  private readonly System.Windows.Threading.DispatcherTimer _countdownTimer =
+    new() { Interval = TimeSpan.FromSeconds(1) };
+  private long _remainingMsInRun;
 
   // 커맨드
   public ICommand RecordCommand  { get; }
@@ -204,6 +225,11 @@ public class MainViewModel : INotifyPropertyChanged
 
     _hookService.EventRecorded   += OnEventRecorded;
     _hookService.LastEventReplace += OnLastEventReplace;
+    _countdownTimer.Tick += (_, __) =>
+    {
+      _remainingMsInRun = Math.Max(0, _remainingMsInRun - 1000);
+      RemainingTimeText = $"남은 시간: {FormatRemaining(_remainingMsInRun)}";
+    };
 
     _ = LoadMacrosAsync();
   }
@@ -273,14 +299,19 @@ public class MainViewModel : INotifyPropertyChanged
 
     SetState(AppState.Playing);
 
+    long runDurationMs = _selectedMacro.Events.Sum(e => e.DelayMs);
+
     void ReportProgress(int current)
     {
       string countLabel = _selectedMacro!.RepeatCount == 0 ? $"{current}/∞" : $"{current}/{_selectedMacro.RepeatCount}";
       StatusText = $"재생 중... ({countLabel})";
+      _remainingMsInRun = runDurationMs;
+      RemainingTimeText = $"남은 시간: {FormatRemaining(_remainingMsInRun)}";
     }
     ReportProgress(1);
     var progress = new Progress<int>(ReportProgress);
 
+    _countdownTimer.Start();
     _playCts = new CancellationTokenSource();
     try
     {
@@ -295,6 +326,8 @@ public class MainViewModel : INotifyPropertyChanged
     }
     finally
     {
+      _countdownTimer.Stop();
+      RemainingTimeText = "";
       _playCts.Dispose();
       _playCts = null;
       SetState(AppState.Idle);

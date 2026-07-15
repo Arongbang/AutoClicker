@@ -18,6 +18,10 @@
       </StatusBarItem>
       <Separator/>
       <StatusBarItem>
+        <TextBlock Text="{Binding RemainingTimeText}" FontWeight="SemiBold" Foreground="#2A6DB0"/>
+      </StatusBarItem>
+      <Separator/>
+      <StatusBarItem>
         <TextBlock Text="F6: 녹화 시작/중단" Foreground="Gray"/>
       </StatusBarItem>
       <Separator/>
