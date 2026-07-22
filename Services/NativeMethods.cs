@@ -5,13 +5,20 @@ namespace AutoClicker.Services;
 internal static class NativeMethods
 {
   // 훅 타입
-  public const int WH_MOUSE_LL = 14;
+  public const int WH_MOUSE_LL    = 14;
+  public const int WH_KEYBOARD_LL = 13;
 
   // 마우스 메시지
   public const int WM_LBUTTONDOWN  = 0x0201;
   public const int WM_RBUTTONDOWN  = 0x0204;
   public const int WM_LBUTTONDBLCLK = 0x0203;
   public const int WM_RBUTTONDBLCLK = 0x0206;
+
+  // 키보드 메시지
+  public const int WM_KEYDOWN    = 0x0100;
+  public const int WM_KEYUP      = 0x0101;
+  public const int WM_SYSKEYDOWN = 0x0104; // Alt 조합키
+  public const int WM_SYSKEYUP   = 0x0105;
 
   // SendInput 플래그
   public const uint MOUSEEVENTF_MOVE       = 0x0001;
@@ -21,6 +28,7 @@ internal static class NativeMethods
   public const uint MOUSEEVENTF_RIGHTUP    = 0x0010;
   public const uint MOUSEEVENTF_ABSOLUTE   = 0x8000;
   public const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;
+  public const uint KEYEVENTF_KEYUP        = 0x0002;
 
   // 핫키
   public const int  WM_HOTKEY = 0x0312;
@@ -34,12 +42,17 @@ internal static class NativeMethods
   public const int SM_CYVIRTUALSCREEN = 79;
 
   // INPUT type
-  public const uint INPUT_MOUSE = 0;
+  public const uint INPUT_MOUSE    = 0;
+  public const uint INPUT_KEYBOARD = 1;
 
   public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+  public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
   [DllImport("user32.dll", SetLastError = true)]
   public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
 
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool UnhookWindowsHookEx(IntPtr hhk);
@@ -80,6 +93,16 @@ internal static class NativeMethods
     public uint    flags;
     public uint    time;
     public IntPtr  dwExtraInfo;
+  }
+
+  [StructLayout(LayoutKind.Sequential)]
+  public struct KBDLLHOOKSTRUCT
+  {
+    public uint   vkCode;
+    public uint   scanCode;
+    public uint   flags;
+    public uint   time;
+    public IntPtr dwExtraInfo;
   }
 
   [StructLayout(LayoutKind.Sequential)]

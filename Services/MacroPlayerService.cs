@@ -25,11 +25,23 @@ public class MacroPlayerService
         if (evt.DelayMs > 0)
           await Task.Delay(TimeSpan.FromMilliseconds(evt.DelayMs), ct);
 
-        // 물리 픽셀 → SendInput 정규화 좌표 (0~65535)
-        int nx = (int)((long)(evt.X - vLeft) * 65535 / vWidth);
-        int ny = (int)((long)(evt.Y - vTop)  * 65535 / vHeight);
+        switch (evt.EventType)
+        {
+          case MacroEventType.MouseClick:
+            // 물리 픽셀 → SendInput 정규화 좌표 (0~65535)
+            int nx = (int)((long)(evt.X - vLeft) * 65535 / vWidth);
+            int ny = (int)((long)(evt.Y - vTop)  * 65535 / vHeight);
+            SendClick(evt.Button, evt.ClickType, nx, ny);
+            break;
 
-        SendClick(evt.Button, evt.ClickType, nx, ny);
+          case MacroEventType.KeyDown:
+            SendKeyEvent(evt.KeyCode, isKeyUp: false);
+            break;
+
+          case MacroEventType.KeyUp:
+            SendKeyEvent(evt.KeyCode, isKeyUp: true);
+            break;
+        }
       }
       completedRuns++;
     }
@@ -94,5 +106,25 @@ public class MacroPlayerService
         }
       }
     };
+  }
+
+  private static void SendKeyEvent(int vk, bool isKeyUp)
+  {
+    var input = new NativeMethods.INPUT
+    {
+      type = NativeMethods.INPUT_KEYBOARD,
+      u = new NativeMethods.InputUnion
+      {
+        ki = new NativeMethods.KEYBDINPUT
+        {
+          wVk         = (ushort)vk,
+          wScan       = 0,
+          dwFlags     = isKeyUp ? NativeMethods.KEYEVENTF_KEYUP : 0,
+          time        = 0,
+          dwExtraInfo = IntPtr.Zero
+        }
+      }
+    };
+    NativeMethods.SendInput(1, new[] { input }, Marshal.SizeOf<NativeMethods.INPUT>());
   }
 }

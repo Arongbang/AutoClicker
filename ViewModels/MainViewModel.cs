@@ -66,10 +66,18 @@ public class MacroEventRow : INotifyPropertyChanged
   {
     _source = e;
     Number  = number;
-    Kind    = $"{e.Button} {(e.ClickType == ClickType.Double ? "더블클릭" : "클릭")}";
+    Kind    = e.EventType switch
+    {
+      MacroEventType.MouseClick => $"{e.Button} {(e.ClickType == ClickType.Double ? "더블클릭" : "클릭")}",
+      MacroEventType.KeyDown    => $"{KeyName(e.KeyCode)} 누름",
+      MacroEventType.KeyUp      => $"{KeyName(e.KeyCode)} 뗌",
+      _                         => "?",
+    };
     X       = e.X;
     Y       = e.Y;
   }
+
+  private static string KeyName(int vk) => KeyInterop.KeyFromVirtualKey(vk).ToString();
 
   public event PropertyChangedEventHandler? PropertyChanged;
   private void OnPropertyChanged([CallerMemberName] string? n = null) =>
@@ -80,8 +88,10 @@ public enum AppState { Idle, Recording, Playing }
 
 public class MainViewModel : INotifyPropertyChanged
 {
-  private readonly MouseHookService   _hookService    = new();
-  private readonly MacroPlayerService _playerService  = new();
+  private readonly RecordingClock      _recordingClock;
+  private readonly MouseHookService    _hookService;
+  private readonly KeyboardHookService _keyboardHookService;
+  private readonly MacroPlayerService  _playerService  = new();
   private readonly MacroStorageService _storageService = new();
 
   private AppState _state = AppState.Idle;
@@ -206,6 +216,10 @@ public class MainViewModel : INotifyPropertyChanged
 
   public MainViewModel()
   {
+    _recordingClock      = new RecordingClock();
+    _hookService         = new MouseHookService(_recordingClock);
+    _keyboardHookService = new KeyboardHookService(_recordingClock);
+
     RecordCommand   = new RelayCommand(_ => StartRecording(),  _ => _state == AppState.Idle && _selectedMacro != null);
     StopCommand     = new RelayCommand(_ => Stop(removeLastEvent: true), _ => _state != AppState.Idle);
     PlayCommand     = new AsyncRelayCommand(_ => StartPlayingAsync(), _ => _state == AppState.Idle && _selectedMacro?.Events.Count > 0);
@@ -229,6 +243,7 @@ public class MainViewModel : INotifyPropertyChanged
 
     _hookService.EventRecorded   += OnEventRecorded;
     _hookService.LastEventReplace += OnLastEventReplace;
+    _keyboardHookService.EventRecorded += OnEventRecorded;
     _countdownTimer.Tick += (_, __) =>
     {
       _remainingMsInRun = Math.Max(0, _remainingMsInRun - 1000);
@@ -262,7 +277,9 @@ public class MainViewModel : INotifyPropertyChanged
     CurrentEvents.Clear();
     SetState(AppState.Recording);
     StatusText = "녹화 중... (F6 또는 Stop을 눌러 중단)";
+    _recordingClock.Reset();
     _hookService.StartRecording();
+    _keyboardHookService.StartRecording();
   }
 
   private void Stop(bool removeLastEvent = false)
@@ -270,6 +287,7 @@ public class MainViewModel : INotifyPropertyChanged
     if (_state == AppState.Recording)
     {
       _hookService.StopRecording();
+      _keyboardHookService.StopRecording();
       // 버튼 클릭으로 정지한 경우 마지막 이벤트(정지 버튼 클릭)를 제거
       if (removeLastEvent && _selectedMacro != null && _selectedMacro.Events.Count > 0)
       {
@@ -389,7 +407,8 @@ public class MainViewModel : INotifyPropertyChanged
         RepeatCount = m.RepeatCount,
         Events      = m.Events.Select(e => new MacroEvent
         {
-          Button = e.Button, ClickType = e.ClickType, X = e.X, Y = e.Y, DelayMs = e.DelayMs
+          EventType = e.EventType, Button = e.Button, ClickType = e.ClickType,
+          X = e.X, Y = e.Y, KeyCode = e.KeyCode, DelayMs = e.DelayMs
         }).ToList()
       };
       Macros.Add(copy);
