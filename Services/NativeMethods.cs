@@ -34,6 +34,7 @@ internal static class NativeMethods
   public const int  WM_HOTKEY = 0x0312;
   public const uint VK_F6     = 0x75;
   public const uint VK_F7     = 0x76;
+  public const int  VK_ESCAPE = 0x1B;
 
   // GetSystemMetrics 인덱스 (가상 데스크탑)
   public const int SM_XVIRTUALSCREEN  = 76;
@@ -77,6 +78,9 @@ internal static class NativeMethods
 
   [DllImport("user32.dll")]
   public static extern int GetSystemMetrics(int nIndex);
+
+  [DllImport("user32.dll")]
+  public static extern uint GetDoubleClickTime();
 
   [StructLayout(LayoutKind.Sequential)]
   public struct POINT

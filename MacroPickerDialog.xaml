@@ -1,0 +1,22 @@
+<Window x:Class="AutoClicker.MacroPickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="기본 매크로 추가"
+        Width="320" Height="380"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False">
+
+  <DockPanel Margin="10">
+    <TextBlock DockPanel.Dock="Top" Text="참조할 기본 매크로를 선택하세요." Margin="0,0,0,8"/>
+
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+      <TextBlock Text="반복:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+      <TextBox x:Name="RepeatBox" Text="1" Width="50" Padding="2" TextAlignment="Right" Margin="0,0,12,0"/>
+      <Button x:Name="AddButton" Content="추가" Width="70" IsDefault="True" Click="OnAdd"/>
+      <Button Content="취소" Width="70" Margin="6,0,0,0" IsCancel="True"/>
+    </StackPanel>
+
+    <ListBox x:Name="MacroListBox" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+  </DockPanel>
+</Window>

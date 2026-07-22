@@ -31,6 +31,8 @@
     </StatusBar>
 
     <!-- 메인 콘텐츠 -->
+    <TabControl SelectedIndex="{Binding ActiveTabIndex, Mode=TwoWay}">
+    <TabItem Header="기본 매크로">
     <Grid Margin="4">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="200" MinWidth="140"/>
@@ -143,5 +145,129 @@
         </DockPanel>
       </GroupBox>
     </Grid>
+    </TabItem>
+
+    <TabItem Header="합성 매크로">
+    <Grid Margin="4">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="200" MinWidth="140"/>
+        <ColumnDefinition Width="5"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <!-- 좌: 저장된 합성 매크로 목록 -->
+      <GroupBox Grid.Column="0">
+        <GroupBox.Header>
+          <DockPanel LastChildFill="False">
+            <TextBlock Text="합성 매크로" VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Right" Content="▼" Command="{Binding MoveCompositeDownCommand}"
+                    MinWidth="0" Padding="6,2" Margin="2,0,0,0" ToolTip="아래로 이동"/>
+            <Button DockPanel.Dock="Right" Content="▲" Command="{Binding MoveCompositeUpCommand}"
+                    MinWidth="0" Padding="6,2" Margin="8,0,0,0" ToolTip="위로 이동"/>
+          </DockPanel>
+        </GroupBox.Header>
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+            <Button Content="+ 새 합성"   Command="{Binding NewCompositeCommand}"       MinWidth="0" Padding="6,4"/>
+            <Button Content="복사"        Command="{Binding DuplicateCompositeCommand}" MinWidth="0" Padding="6,4"/>
+            <Button Content="삭제"        Command="{Binding DeleteCompositeCommand}"    MinWidth="0" Padding="6,4"/>
+          </StackPanel>
+          <ListBox x:Name="CompositeListBox"
+                   ItemsSource="{Binding CompositeMacros}"
+                   SelectedItem="{Binding SelectedComposite}"
+                   SelectionMode="Extended"
+                   DisplayMemberPath="Name"
+                   SelectionChanged="CompositeListBox_SelectionChanged"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+        </DockPanel>
+      </GroupBox>
+
+      <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="Transparent"/>
+
+      <!-- 우: 합성 매크로 상세 -->
+      <GroupBox Grid.Column="2" Header="합성 매크로 상세">
+        <DockPanel>
+          <!-- 설정 영역 -->
+          <Border DockPanel.Dock="Top" Padding="4,4,4,8"
+                  BorderBrush="#DDD" BorderThickness="0,0,0,1">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+              </Grid.RowDefinitions>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+
+              <!-- 이름 -->
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="이름:" VerticalAlignment="Center" Margin="0,4,8,4"/>
+              <TextBox   Grid.Row="0" Grid.Column="1"
+                         Text="{Binding CompositeName, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" Padding="4,2" Margin="0,4"/>
+
+              <!-- 반복 횟수 -->
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="반복:" VerticalAlignment="Center" Margin="0,4,8,4"/>
+              <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4">
+                <TextBox Text="{Binding CompositeRepeatCountText, UpdateSourceTrigger=LostFocus}"
+                         IsEnabled="{Binding CompositeIsRepeatCountEnabled}"
+                         Width="60" Padding="4,2" TextAlignment="Right"/>
+                <TextBlock Text="회" VerticalAlignment="Center" Margin="4,0,12,0"/>
+                <CheckBox  Content="무한 반복"
+                           IsChecked="{Binding CompositeIsInfiniteRepeat}"
+                           VerticalAlignment="Center"/>
+              </StackPanel>
+
+              <!-- 예상 소요시간 -->
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="소요시간:" VerticalAlignment="Center" Margin="0,4,8,4"/>
+              <TextBlock Grid.Row="2" Grid.Column="1"
+                         Text="{Binding CompositeEstimatedDurationText, StringFormat='예상 소요시간(1회): {0}'}"
+                         VerticalAlignment="Center" Margin="0,4"/>
+
+              <!-- 버튼 행 -->
+              <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                          Orientation="Horizontal" Margin="0,6,0,0">
+                <Button Content="■ 정지" Command="{Binding StopCommand}"         Background="#ECECFF"/>
+                <Button Content="▶ 재생" Command="{Binding PlayCompositeCommand}" Background="#ECFFEC"/>
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- 스텝 목록 -->
+          <GroupBox Header="구성 스텝">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                <Button Content="+ 기본 매크로 추가" Command="{Binding AddMacroRefStepCommand}" MinWidth="0" Padding="6,4"/>
+                <Button Content="● 입력 1개 캡처"   Command="{Binding CaptureStepCommand}"     MinWidth="0" Padding="6,4"/>
+                <Button Content="삭제"             Command="{Binding RemoveStepCommand}"      MinWidth="0" Padding="6,4"/>
+                <Button Content="▲" Command="{Binding MoveStepUpCommand}"   MinWidth="0" Padding="6,4" ToolTip="위로 이동"/>
+                <Button Content="▼" Command="{Binding MoveStepDownCommand}" MinWidth="0" Padding="6,4" ToolTip="아래로 이동"/>
+              </StackPanel>
+              <DataGrid ItemsSource="{Binding CurrentSteps}"
+                        SelectedItem="{Binding SelectedStepRow, Mode=TwoWay}"
+                        AutoGenerateColumns="False"
+                        CanUserAddRows="False"
+                        CanUserDeleteRows="False"
+                        CanUserSortColumns="False"
+                        CanUserResizeRows="False"
+                        GridLinesVisibility="Horizontal"
+                        HeadersVisibility="Column"
+                        SelectionMode="Single"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="#"    Binding="{Binding Number}" Width="40"  IsReadOnly="True"/>
+                  <DataGridTextColumn Header="내용" Binding="{Binding Kind}"   Width="*"   IsReadOnly="True"/>
+                  <DataGridTextColumn Header="지연" Binding="{Binding Delay}"  Width="80"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
+          </GroupBox>
+        </DockPanel>
+      </GroupBox>
+    </Grid>
+    </TabItem>
+    </TabControl>
   </DockPanel>
 </Window>

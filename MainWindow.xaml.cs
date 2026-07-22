@@ -18,6 +18,16 @@ public partial class MainWindow : Window
   public MainWindow()
   {
     InitializeComponent();
+    if (DataContext is MainViewModel vm) WireViewModel(vm);
+  }
+
+  private void WireViewModel(MainViewModel vm)
+  {
+    vm.MacroPickerPrompt = names =>
+    {
+      var dialog = new MacroPickerDialog(names) { Owner = this };
+      return dialog.ShowDialog() == true ? (dialog.SelectedName, dialog.RepeatCount) : (null, 1);
+    };
   }
 
   protected override void OnSourceInitialized(EventArgs e)
@@ -57,6 +67,16 @@ public partial class MainWindow : Window
       vm.SetSelectedMacros(lb.SelectedItems.Cast<Macro>());
       if (lb.SelectedItems.Count == 1)
         vm.SelectedMacro = (Macro)lb.SelectedItems[0]!;
+    }
+  }
+
+  private void CompositeListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+  {
+    if (DataContext is MainViewModel vm && sender is ListBox lb)
+    {
+      vm.SetSelectedComposites(lb.SelectedItems.Cast<CompositeMacro>());
+      if (lb.SelectedItems.Count == 1)
+        vm.SelectedComposite = (CompositeMacro)lb.SelectedItems[0]!;
     }
   }
 
