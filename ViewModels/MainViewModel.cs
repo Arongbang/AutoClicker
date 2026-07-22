@@ -275,6 +275,7 @@ public class MainViewModel : INotifyPropertyChanged
       if (int.TryParse(value, out int n) && n >= 1)
       {
         _selectedMacro.RepeatCount = n;
+        OnPropertyChanged(nameof(CompositeEstimatedDurationText));
         _ = SaveAsync();
       }
       OnPropertyChanged();
@@ -291,6 +292,7 @@ public class MainViewModel : INotifyPropertyChanged
       OnPropertyChanged();
       OnPropertyChanged(nameof(RepeatCountText));
       OnPropertyChanged(nameof(IsRepeatCountEnabled));
+      OnPropertyChanged(nameof(CompositeEstimatedDurationText));
       _ = SaveAsync();
     }
   }
@@ -501,8 +503,14 @@ public class MainViewModel : INotifyPropertyChanged
       _remainingMsInRun = Math.Max(0, _remainingMsInRun - 1000);
       RemainingTimeText = $"남은 시간: {FormatRemaining(_remainingMsInRun)}";
     };
-    _ = LoadMacrosAsync();
-    _ = LoadCompositesAsync();
+    _ = InitializeAsync();
+  }
+
+  // 합성 매크로는 기본 매크로 이름으로 참조를 해석하므로, 기본 매크로 로딩이 끝난 뒤에 합성 매크로를 로딩해야 한다.
+  private async Task InitializeAsync()
+  {
+    await LoadMacrosAsync();
+    await LoadCompositesAsync();
   }
 
   private async Task LoadMacrosAsync()
@@ -777,6 +785,7 @@ public class MainViewModel : INotifyPropertyChanged
       Macros.Remove(m);
     SelectedMacro = Macros.Count > 0 ? Macros[0] : null;
     RefreshAllStepKinds();
+    OnPropertyChanged(nameof(CompositeEstimatedDurationText));
     _ = SaveAsync();
   }
 
@@ -995,6 +1004,7 @@ public class MainViewModel : INotifyPropertyChanged
     _selectedComposite.Steps.Add(step);
     AddStepRow(step, CurrentSteps.Count + 1);
     OnPropertyChanged(nameof(CompositeEstimatedDurationText));
+    RaiseAllCommands();
   }
 
   private void AddMacroRefStep()
@@ -1015,6 +1025,8 @@ public class MainViewModel : INotifyPropertyChanged
     _selectedComposite.Steps.Remove(_selectedStepRow.Source);
     _selectedStepRow = null;
     RefreshStepList();
+    OnPropertyChanged(nameof(CompositeEstimatedDurationText));
+    RaiseAllCommands();
     _ = SaveCompositesAsync();
   }
 

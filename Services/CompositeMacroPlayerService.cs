@@ -50,7 +50,10 @@ public class CompositeMacroPlayerService
         if (step.StepType == CompositeStepType.MacroRef)
         {
           var baseMacro = resolved[step.MacroName];
-          for (int i = 0; i < step.RepeatCount; i++)
+          // 기본 매크로 자체의 반복 설정도 곱해서 실행한다. 무한 반복(0)으로 설정된 매크로는 1회로 취급한다.
+          int baseRepeat = baseMacro.RepeatCount == 0 ? 1 : baseMacro.RepeatCount;
+          int totalRepeat = step.RepeatCount * baseRepeat;
+          for (int i = 0; i < totalRepeat; i++)
           {
             ct.ThrowIfCancellationRequested();
             await MacroPlayerService.PlayEventsOnceAsync(baseMacro.Events, ct).ConfigureAwait(false);
@@ -83,7 +86,11 @@ public class CompositeMacroPlayerService
       {
         var baseMacro = resolveMacro(step.MacroName);
         if (baseMacro != null)
-          total += baseMacro.Events.Sum(e => e.DelayMs) * step.RepeatCount;
+        {
+          // 기본 매크로 자체의 반복 설정도 곱해서 계산한다. 무한 반복(0)으로 설정된 매크로는 1회로 취급한다.
+          int baseRepeat = baseMacro.RepeatCount == 0 ? 1 : baseMacro.RepeatCount;
+          total += baseMacro.Events.Sum(e => e.DelayMs) * step.RepeatCount * baseRepeat;
+        }
       }
     }
     return total;
