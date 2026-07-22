@@ -93,6 +93,17 @@ public class MacroEventRow : INotifyPropertyChanged
     }
   }
 
+  public string Description
+  {
+    get => Source.Description;
+    set
+    {
+      if (value == Source.Description) return;
+      Source.Description = value;
+      OnPropertyChanged();
+    }
+  }
+
   public MacroEventRow(MacroEvent e, int number)
   {
     Source = e;
@@ -108,6 +119,7 @@ public class MacroEventRow : INotifyPropertyChanged
     OnPropertyChanged(nameof(X));
     OnPropertyChanged(nameof(Y));
     OnPropertyChanged(nameof(Delay));
+    OnPropertyChanged(nameof(Description));
   }
 
   private void RefreshFields()
@@ -822,7 +834,7 @@ public class MainViewModel : INotifyPropertyChanged
         Events      = m.Events.Select(e => new MacroEvent
         {
           EventType = e.EventType, Button = e.Button, ClickType = e.ClickType,
-          X = e.X, Y = e.Y, KeyCode = e.KeyCode, DelayMs = e.DelayMs
+          X = e.X, Y = e.Y, KeyCode = e.KeyCode, DelayMs = e.DelayMs, Description = e.Description
         }).ToList()
       };
       Macros.Add(copy);
@@ -865,6 +877,10 @@ public class MainViewModel : INotifyPropertyChanged
       if (args.PropertyName == nameof(MacroEventRow.Delay))
       {
         OnPropertyChanged(nameof(EstimatedDurationText));
+        _ = SaveAsync();
+      }
+      else if (args.PropertyName == nameof(MacroEventRow.Description))
+      {
         _ = SaveAsync();
       }
     };
@@ -925,7 +941,7 @@ public class MainViewModel : INotifyPropertyChanged
     _copiedMacroEvent = new MacroEvent
     {
       EventType = s.EventType, Button = s.Button, ClickType = s.ClickType,
-      X = s.X, Y = s.Y, KeyCode = s.KeyCode, DelayMs = s.DelayMs
+      X = s.X, Y = s.Y, KeyCode = s.KeyCode, DelayMs = s.DelayMs, Description = s.Description
     };
   }
 
@@ -934,13 +950,14 @@ public class MainViewModel : INotifyPropertyChanged
     if (_selectedEventRow == null || _copiedMacroEvent == null) return;
     var target = _selectedEventRow.Source;
     var c = _copiedMacroEvent;
-    target.EventType = c.EventType;
-    target.Button    = c.Button;
-    target.ClickType = c.ClickType;
-    target.X         = c.X;
-    target.Y         = c.Y;
-    target.KeyCode   = c.KeyCode;
-    target.DelayMs   = c.DelayMs;
+    target.EventType   = c.EventType;
+    target.Button      = c.Button;
+    target.ClickType   = c.ClickType;
+    target.X           = c.X;
+    target.Y           = c.Y;
+    target.KeyCode     = c.KeyCode;
+    target.DelayMs     = c.DelayMs;
+    target.Description = c.Description;
     _selectedEventRow.Refresh(); // Kind/X/Y/Delay 표시 갱신 → Delay 변경 통지로 저장까지 이어진다
   }
 

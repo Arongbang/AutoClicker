@@ -149,6 +149,7 @@
                   <DataGridTextColumn Header="X"        Binding="{Binding X}"      Width="65"  IsReadOnly="True"/>
                   <DataGridTextColumn Header="Y"        Binding="{Binding Y}"      Width="65"  IsReadOnly="True"/>
                   <DataGridTextColumn Header="지연" Binding="{Binding Delay}"  Width="80"/>
+                  <DataGridTextColumn Header="설명" Binding="{Binding Description}" Width="*"/>
                 </DataGrid.Columns>
               </DataGrid>
             </DockPanel>

@@ -18,4 +18,7 @@ public class MacroEvent
   public int KeyCode { get; set; }
 
   public long DelayMs { get; set; }
+
+  // 녹화가 끝난 뒤 사용자가 직접 입력하는 설명. 녹화 중에는 항상 빈 값이다.
+  public string Description { get; set; } = "";
 }
