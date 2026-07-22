@@ -252,7 +252,10 @@
             <DockPanel>
               <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                 <Button Content="+ 기본 매크로 추가" Command="{Binding AddMacroRefStepCommand}" MinWidth="0" Padding="6,4"/>
-                <Button Content="● 입력 1개 캡처"   Command="{Binding CaptureStepCommand}"     MinWidth="0" Padding="6,4"/>
+                <Button Content="+ 빈 입력 추가"     Command="{Binding AddEventStepCommand}"    MinWidth="0" Padding="6,4"
+                        ToolTip="선택한 스텝 다음(없으면 맨 끝)에 빈 입력 스텝을 삽입"/>
+                <Button Content="붙여넣기"          Command="{Binding PasteStepCommand}"       MinWidth="0" Padding="6,4"
+                        ToolTip="기본 매크로에서 복사한 내용을 선택한 스텝에 덮어쓰기"/>
                 <Button Content="삭제"             Command="{Binding RemoveStepCommand}"      MinWidth="0" Padding="6,4"/>
                 <Button Content="▲" Command="{Binding MoveStepUpCommand}"   MinWidth="0" Padding="6,4" ToolTip="위로 이동"/>
                 <Button Content="▼" Command="{Binding MoveStepDownCommand}" MinWidth="0" Padding="6,4" ToolTip="아래로 이동"/>

@@ -150,7 +150,9 @@ public class CompositeStepRow : INotifyPropertyChanged
 
   public string Delay
   {
-    get => EventDisplay.FormatDelay(Source.DelayMs);
+    // Empty(빈 스텝)는 지연도 붙여넣기 전까지 빈 값으로 표시한다.
+    get => Source.StepType == CompositeStepType.RawEvent && Source.EventType == MacroEventType.Empty && Source.DelayMs == 0
+      ? "" : EventDisplay.FormatDelay(Source.DelayMs);
     set
     {
       if (!EventDisplay.TryParseDelay(value, out var ms) || ms < 0) return;
@@ -166,11 +168,12 @@ public class CompositeStepRow : INotifyPropertyChanged
     Kind   = BuildKind(s, resolveMacro);
   }
 
-  // 매크로 목록이 바뀌었을 수 있으므로(삭제/재생성) Kind 텍스트를 다시 계산한다.
+  // 매크로 목록이 바뀌었거나(삭제/재생성) 붙여넣기로 내용이 바뀐 뒤 표시값을 다시 계산한다.
   public void Refresh(Func<string, Macro?> resolveMacro)
   {
     Kind = BuildKind(Source, resolveMacro);
     OnPropertyChanged(nameof(Kind));
+    OnPropertyChanged(nameof(Delay));
   }
 
   private static string BuildKind(CompositeStep s, Func<string, Macro?> resolveMacro)
@@ -185,6 +188,7 @@ public class CompositeStepRow : INotifyPropertyChanged
       MacroEventType.MouseClick => $"{s.Button} {(s.ClickType == ClickType.Double ? "더블클릭" : "클릭")}",
       MacroEventType.KeyDown    => $"{EventDisplay.KeyName(s.KeyCode)} 누름",
       MacroEventType.KeyUp      => $"{EventDisplay.KeyName(s.KeyCode)} 뗌",
+      MacroEventType.Empty      => "",
       _                         => "?",
     };
   }
@@ -209,13 +213,7 @@ public class MainViewModel : INotifyPropertyChanged
   private AppState _state = AppState.Idle;
   private CancellationTokenSource? _playCts;
 
-  private bool _isCapturingStep;
-  private uint _capturePendingKeyDownVk;
-  private CompositeStep? _captureMouseStep;
-  private readonly System.Windows.Threading.DispatcherTimer _captureFinalizeTimer =
-    new() { Interval = TimeSpan.FromMilliseconds(500) };
-
-  // '기록된 이벤트' 목록의 복사/붙여넣기용 클립보드(단일 슬롯)
+  // '기록된 이벤트' 목록의 복사/붙여넣기용 클립보드(단일 슬롯). 합성 매크로의 구성 스텝 붙여넣기도 이 클립보드를 공유한다.
   private MacroEvent? _copiedMacroEvent;
 
   public ObservableCollection<Macro>        Macros        { get; } = new();
@@ -441,7 +439,8 @@ public class MainViewModel : INotifyPropertyChanged
   public ICommand MoveCompositeDownCommand { get; }
   public ICommand PlayCompositeCommand     { get; }
   public ICommand AddMacroRefStepCommand   { get; }
-  public ICommand CaptureStepCommand       { get; }
+  public ICommand AddEventStepCommand      { get; }
+  public ICommand PasteStepCommand         { get; }
   public ICommand RemoveStepCommand        { get; }
   public ICommand MoveStepUpCommand        { get; }
   public ICommand MoveStepDownCommand      { get; }
@@ -488,11 +487,8 @@ public class MainViewModel : INotifyPropertyChanged
     MoveCompositeDownCommand  = new RelayCommand(_ => MoveComposite(1),  _ => _state == AppState.Idle && _selectedComposite != null && CompositeMacros.IndexOf(_selectedComposite) >= 0 && CompositeMacros.IndexOf(_selectedComposite) < CompositeMacros.Count - 1);
     PlayCompositeCommand      = new AsyncRelayCommand(_ => StartPlayingCompositeAsync(), _ => _state == AppState.Idle && _selectedComposite?.Steps.Count > 0);
     AddMacroRefStepCommand    = new RelayCommand(_ => AddMacroRefStep(), _ => _state == AppState.Idle && _selectedComposite != null && Macros.Count > 0);
-    CaptureStepCommand        = new RelayCommand(_ =>
-    {
-      if (_isCapturingStep) CancelCaptureStep();
-      else StartCaptureStep();
-    }, _ => _isCapturingStep || (_state == AppState.Idle && _selectedComposite != null));
+    AddEventStepCommand       = new RelayCommand(_ => InsertBlankStep(),      _ => _state == AppState.Idle && _selectedComposite != null);
+    PasteStepCommand         = new RelayCommand(_ => PasteIntoSelectedStep(), _ => _state == AppState.Idle && _selectedStepRow != null && _copiedMacroEvent != null);
     RemoveStepCommand  = new RelayCommand(_ => RemoveSelectedStep(), _ => _state == AppState.Idle && _selectedComposite != null && _selectedStepRow != null);
     MoveStepUpCommand   = new RelayCommand(_ => MoveStep(-1), _ => _state == AppState.Idle && _selectedComposite != null && _selectedStepRow != null && _selectedComposite.Steps.IndexOf(_selectedStepRow.Source) > 0);
     MoveStepDownCommand = new RelayCommand(_ => MoveStep(1),  _ => _state == AppState.Idle && _selectedComposite != null && _selectedStepRow != null && _selectedComposite.Steps.IndexOf(_selectedStepRow.Source) < _selectedComposite.Steps.Count - 1);
@@ -505,12 +501,6 @@ public class MainViewModel : INotifyPropertyChanged
       _remainingMsInRun = Math.Max(0, _remainingMsInRun - 1000);
       RemainingTimeText = $"남은 시간: {FormatRemaining(_remainingMsInRun)}";
     };
-    _captureFinalizeTimer.Tick += (_, __) =>
-    {
-      _captureFinalizeTimer.Stop();
-      FinalizeCapture();
-    };
-
     _ = LoadMacrosAsync();
     _ = LoadCompositesAsync();
   }
@@ -571,11 +561,6 @@ public class MainViewModel : INotifyPropertyChanged
 
   private void Stop(bool removeLastEvent = false)
   {
-    if (_isCapturingStep)
-    {
-      CancelCaptureStep();
-      return;
-    }
     if (_state == AppState.Recording)
     {
       _hookService.StopRecording();
@@ -685,6 +670,13 @@ public class MainViewModel : INotifyPropertyChanged
     {
       MessageBox.Show($"다음 기본 매크로에 빈 이벤트가 있어 실행할 수 없습니다: {string.Join(", ", emptyEventMacros)}",
         "실행 불가", MessageBoxButton.OK, MessageBoxImage.Error);
+      return;
+    }
+
+    if (_selectedComposite.Steps.Any(s => s.StepType == CompositeStepType.RawEvent && s.EventType == MacroEventType.Empty))
+    {
+      MessageBox.Show("빈 스텝이 있습니다. 삭제하거나 복사·붙여넣기로 채운 뒤 다시 시도하세요.",
+        "실행 불가", MessageBoxButton.OK, MessageBoxImage.Warning);
       return;
     }
 
@@ -891,7 +883,6 @@ public class MainViewModel : INotifyPropertyChanged
   {
     Application.Current.Dispatcher.Invoke(() =>
     {
-      if (_isCapturingStep) { HandleCaptureEvent(evt); return; }
       _selectedMacro?.Events.Add(evt);
       AddEventRow(evt, CurrentEvents.Count + 1);
       OnPropertyChanged(nameof(EstimatedDurationText));
@@ -902,15 +893,6 @@ public class MainViewModel : INotifyPropertyChanged
   {
     Application.Current.Dispatcher.Invoke(() =>
     {
-      if (_isCapturingStep)
-      {
-        if (_captureMouseStep != null)
-        {
-          _captureMouseStep.ClickType = clickType;
-          RefreshStepList();
-        }
-        return;
-      }
       if (_selectedMacro == null || _selectedMacro.Events.Count == 0) return;
       var last = _selectedMacro.Events[^1];
       last.ClickType = clickType;
@@ -1050,81 +1032,40 @@ public class MainViewModel : INotifyPropertyChanged
     _ = SaveCompositesAsync();
   }
 
-  // ---- 스텝 1개 원샷 캡처 ("입력 1개 캡처" 버튼) ----
+  // ---- 스텝 목록의 빈 입력 추가/붙여넣기 ("+ 빈 입력 추가" / "붙여넣기" 버튼) ----
 
-  private void StartCaptureStep()
+  // '입력 추가' 버튼: 선택된 스텝 바로 다음(선택 없으면 맨 끝)에 값이 빈 RawEvent 스텝을 삽입한다.
+  // 종류는 읽기 전용 칼럼이라 직접 입력할 수 없으므로, 기본 매크로의 이벤트를 복사해 붙여넣는 용도다.
+  private void InsertBlankStep()
   {
-    if (_selectedComposite == null || _state != AppState.Idle) return;
-    _isCapturingStep = true;
-    _capturePendingKeyDownVk = 0;
-    _captureMouseStep = null;
-    SetState(AppState.Recording);
-    StatusText = "입력을 기다리는 중... (Esc로 취소)";
-    _recordingClock.Reset();
-    _hookService.StartRecording();
-    _keyboardHookService.StartRecording();
+    if (_selectedComposite == null) return;
+    int insertIdx = _selectedStepRow != null
+      ? _selectedComposite.Steps.IndexOf(_selectedStepRow.Source) + 1
+      : _selectedComposite.Steps.Count;
+    _selectedComposite.Steps.Insert(insertIdx,
+      new CompositeStep { StepType = CompositeStepType.RawEvent, EventType = MacroEventType.Empty });
+    RefreshStepList();
+    SelectedStepRow = CurrentSteps[insertIdx];
+    OnPropertyChanged(nameof(CompositeEstimatedDurationText));
+    _ = SaveCompositesAsync();
   }
 
-  private void CancelCaptureStep()
+  // 기본 매크로의 '기록된 이벤트' 목록에서 복사한 내용을 선택된 스텝에 덮어쓴다.
+  private void PasteIntoSelectedStep()
   {
-    if (!_isCapturingStep) return;
-    _captureFinalizeTimer.Stop();
-    _hookService.StopRecording();
-    _keyboardHookService.StopRecording();
-    _isCapturingStep = false;
-    _captureMouseStep = null;
-    _capturePendingKeyDownVk = 0;
-    StatusText = "캡처 취소됨";
-    SetState(AppState.Idle);
-  }
-
-  private void HandleCaptureEvent(MacroEvent evt)
-  {
-    if (evt.EventType == MacroEventType.MouseClick)
-    {
-      _keyboardHookService.StopRecording();
-      var step = new CompositeStep
-      {
-        StepType = CompositeStepType.RawEvent, EventType = MacroEventType.MouseClick,
-        Button = evt.Button, ClickType = evt.ClickType, X = evt.X, Y = evt.Y
-      };
-      _captureMouseStep = step;
-      AddStepToComposite(step);
-      _captureFinalizeTimer.Interval = TimeSpan.FromMilliseconds(NativeMethods.GetDoubleClickTime());
-      _captureFinalizeTimer.Start();
-      return;
-    }
-
-    if (evt.EventType == MacroEventType.KeyDown && evt.KeyCode == NativeMethods.VK_ESCAPE)
-    {
-      CancelCaptureStep();
-      return;
-    }
-
-    _hookService.StopRecording(); // 입력이 키보드로 확정되었으므로 마우스 훅은 더 필요 없다
-    AddStepToComposite(new CompositeStep
-    {
-      StepType = CompositeStepType.RawEvent, EventType = evt.EventType, KeyCode = evt.KeyCode
-    });
-
-    if (evt.EventType == MacroEventType.KeyDown)
-    {
-      _capturePendingKeyDownVk = (uint)evt.KeyCode;
-      return; // 대응하는 KeyUp을 기다린다
-    }
-
-    FinalizeCapture();
-  }
-
-  private void FinalizeCapture()
-  {
-    _hookService.StopRecording();
-    _keyboardHookService.StopRecording();
-    _isCapturingStep = false;
-    _captureMouseStep = null;
-    _capturePendingKeyDownVk = 0;
-    StatusText = "입력 캡처 완료";
-    SetState(AppState.Idle);
+    if (_selectedStepRow == null || _copiedMacroEvent == null) return;
+    var target = _selectedStepRow.Source;
+    var c = _copiedMacroEvent;
+    target.StepType  = CompositeStepType.RawEvent;
+    target.EventType = c.EventType;
+    target.Button    = c.Button;
+    target.ClickType = c.ClickType;
+    target.X         = c.X;
+    target.Y         = c.Y;
+    target.KeyCode   = c.KeyCode;
+    target.DelayMs   = c.DelayMs;
+    _selectedStepRow.Refresh(ResolveMacroByName);
+    OnPropertyChanged(nameof(CompositeEstimatedDurationText));
     _ = SaveCompositesAsync();
   }
 
@@ -1164,7 +1105,8 @@ public class MainViewModel : INotifyPropertyChanged
     ((RelayCommand)MoveCompositeDownCommand).RaiseCanExecuteChanged();
     ((AsyncRelayCommand)PlayCompositeCommand).RaiseCanExecuteChanged();
     ((RelayCommand)AddMacroRefStepCommand).RaiseCanExecuteChanged();
-    ((RelayCommand)CaptureStepCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)AddEventStepCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)PasteStepCommand).RaiseCanExecuteChanged();
     ((RelayCommand)RemoveStepCommand).RaiseCanExecuteChanged();
     ((RelayCommand)MoveStepUpCommand).RaiseCanExecuteChanged();
     ((RelayCommand)MoveStepDownCommand).RaiseCanExecuteChanged();
