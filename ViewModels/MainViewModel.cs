@@ -22,28 +22,51 @@ internal static class EventDisplay
     return $"{ms}ms";
   }
 
-  // "500", "500ms", "1.5s", "2m", "1h" 등 ms/s/m/h 단위 입력을 밀리초로 변환한다.
+  private static readonly Regex SingleDelayPattern   = new(@"^([0-9]*\.?[0-9]+)\s*(ms|s|m|h)?$", RegexOptions.IgnoreCase);
+  private static readonly Regex CombinedDelayPattern = new(
+    @"^(?:([0-9]*\.?[0-9]+)h)?\s*(?:([0-9]*\.?[0-9]+)m)?\s*(?:([0-9]*\.?[0-9]+)s)?\s*(?:([0-9]*\.?[0-9]+)ms)?$",
+    RegexOptions.IgnoreCase);
+
+  // "500", "500ms", "1.5s", "2m", "1h" 등 단일 단위 입력과
+  // "5m20s", "1h12m30s" 처럼 h/m/s/ms를 이어 쓴 복합 단위 입력을 모두 밀리초로 변환한다.
   public static bool TryParseDelay(string? text, out long ms)
   {
     ms = 0;
     if (string.IsNullOrWhiteSpace(text)) return false;
+    var trimmed = text.Trim();
 
-    var match = Regex.Match(text.Trim(), @"^([0-9]*\.?[0-9]+)\s*(ms|s|m|h)?$", RegexOptions.IgnoreCase);
-    if (!match.Success) return false;
-    if (!double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
-      return false;
-
-    var unitMs = match.Groups[2].Value.ToLowerInvariant() switch
+    var single = SingleDelayPattern.Match(trimmed);
+    if (single.Success)
     {
-      "h" => 3_600_000d,
-      "m" => 60_000d,
-      "s" => 1_000d,
-      _   => 1d,
-    };
+      if (!double.TryParse(single.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        return false;
+      var unitMs = single.Groups[2].Value.ToLowerInvariant() switch
+      {
+        "h" => 3_600_000d,
+        "m" => 60_000d,
+        "s" => 1_000d,
+        _   => 1d,
+      };
+      ms = (long)Math.Round(value * unitMs);
+      return true;
+    }
 
-    ms = (long)Math.Round(value * unitMs);
+    var combined = CombinedDelayPattern.Match(trimmed);
+    bool hasAnyUnit = combined.Groups[1].Success || combined.Groups[2].Success
+                    || combined.Groups[3].Success || combined.Groups[4].Success;
+    if (!combined.Success || !hasAnyUnit) return false;
+
+    double totalMs = 0;
+    if (combined.Groups[1].Success) totalMs += ParseUnit(combined.Groups[1].Value) * 3_600_000d;
+    if (combined.Groups[2].Success) totalMs += ParseUnit(combined.Groups[2].Value) * 60_000d;
+    if (combined.Groups[3].Success) totalMs += ParseUnit(combined.Groups[3].Value) * 1_000d;
+    if (combined.Groups[4].Success) totalMs += ParseUnit(combined.Groups[4].Value);
+    ms = (long)Math.Round(totalMs);
     return true;
   }
+
+  private static double ParseUnit(string value) =>
+    double.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
 
   public static string KeyName(int vk) => KeyInterop.KeyFromVirtualKey(vk).ToString();
 }
