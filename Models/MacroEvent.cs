@@ -2,7 +2,7 @@ namespace AutoClicker.Models;
 
 public enum MouseButton    { Left, Right }
 public enum ClickType      { Single, Double }
-public enum MacroEventType { MouseClick, KeyDown, KeyUp }
+public enum MacroEventType { MouseClick, KeyDown, KeyUp, Empty }
 
 public class MacroEvent
 {

@@ -123,24 +123,35 @@
 
           <!-- 이벤트 목록 -->
           <GroupBox Header="기록된 이벤트">
-            <DataGrid ItemsSource="{Binding CurrentEvents}"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      CanUserDeleteRows="False"
-                      CanUserSortColumns="False"
-                      CanUserResizeRows="False"
-                      GridLinesVisibility="Horizontal"
-                      HeadersVisibility="Column"
-                      SelectionMode="Single"
-                      ScrollViewer.VerticalScrollBarVisibility="Auto">
-              <DataGrid.Columns>
-                <DataGridTextColumn Header="#"        Binding="{Binding Number}" Width="40"  IsReadOnly="True"/>
-                <DataGridTextColumn Header="종류"     Binding="{Binding Kind}"   Width="110" IsReadOnly="True"/>
-                <DataGridTextColumn Header="X"        Binding="{Binding X}"      Width="65"  IsReadOnly="True"/>
-                <DataGridTextColumn Header="Y"        Binding="{Binding Y}"      Width="65"  IsReadOnly="True"/>
-                <DataGridTextColumn Header="지연" Binding="{Binding Delay}"  Width="80"/>
-              </DataGrid.Columns>
-            </DataGrid>
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                <Button Content="+ 추가"     Command="{Binding AddEventCommand}"    MinWidth="0" Padding="6,4"
+                        ToolTip="선택한 행 다음(없으면 맨 끝)에 빈 이벤트를 삽입"/>
+                <Button Content="복사"       Command="{Binding CopyEventCommand}"   MinWidth="0" Padding="6,4"/>
+                <Button Content="붙여넣기"   Command="{Binding PasteEventCommand}"  MinWidth="0" Padding="6,4"
+                        ToolTip="복사한 내용을 선택한 행에 덮어쓰기"/>
+                <Button Content="삭제"       Command="{Binding DeleteEventCommand}" MinWidth="0" Padding="6,4"/>
+              </StackPanel>
+              <DataGrid ItemsSource="{Binding CurrentEvents}"
+                        SelectedItem="{Binding SelectedEventRow, Mode=TwoWay}"
+                        AutoGenerateColumns="False"
+                        CanUserAddRows="False"
+                        CanUserDeleteRows="False"
+                        CanUserSortColumns="False"
+                        CanUserResizeRows="False"
+                        GridLinesVisibility="Horizontal"
+                        HeadersVisibility="Column"
+                        SelectionMode="Single"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="#"        Binding="{Binding Number}" Width="40"  IsReadOnly="True"/>
+                  <DataGridTextColumn Header="종류"     Binding="{Binding Kind}"   Width="110" IsReadOnly="True"/>
+                  <DataGridTextColumn Header="X"        Binding="{Binding X}"      Width="65"  IsReadOnly="True"/>
+                  <DataGridTextColumn Header="Y"        Binding="{Binding Y}"      Width="65"  IsReadOnly="True"/>
+                  <DataGridTextColumn Header="지연" Binding="{Binding Delay}"  Width="80"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
           </GroupBox>
         </DockPanel>
       </GroupBox>

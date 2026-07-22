@@ -50,37 +50,55 @@ internal static class EventDisplay
 
 public class MacroEventRow : INotifyPropertyChanged
 {
-  private readonly MacroEvent _source;
+  internal readonly MacroEvent Source;
 
   public int    Number { get; }
-  public string Kind   { get; }
-  public int    X      { get; }
-  public int    Y      { get; }
+  public string Kind   { get; private set; } = "";
+  public string X      { get; private set; } = "";
+  public string Y      { get; private set; } = "";
 
   public string Delay
   {
-    get => EventDisplay.FormatDelay(_source.DelayMs);
+    // Empty(빈 이벤트)는 지연도 붙여넣기 전까지 빈 값으로 표시한다.
+    get => Source.EventType == MacroEventType.Empty && Source.DelayMs == 0
+      ? "" : EventDisplay.FormatDelay(Source.DelayMs);
     set
     {
       if (!EventDisplay.TryParseDelay(value, out var ms) || ms < 0) return;
-      _source.DelayMs = ms;
+      Source.DelayMs = ms;
       OnPropertyChanged();
     }
   }
 
   public MacroEventRow(MacroEvent e, int number)
   {
-    _source = e;
-    Number  = number;
-    Kind    = e.EventType switch
+    Source = e;
+    Number = number;
+    RefreshFields();
+  }
+
+  // 붙여넣기로 Source 내용이 바뀐 뒤 표시값을 다시 계산한다.
+  public void Refresh()
+  {
+    RefreshFields();
+    OnPropertyChanged(nameof(Kind));
+    OnPropertyChanged(nameof(X));
+    OnPropertyChanged(nameof(Y));
+    OnPropertyChanged(nameof(Delay));
+  }
+
+  private void RefreshFields()
+  {
+    Kind = Source.EventType switch
     {
-      MacroEventType.MouseClick => $"{e.Button} {(e.ClickType == ClickType.Double ? "더블클릭" : "클릭")}",
-      MacroEventType.KeyDown    => $"{EventDisplay.KeyName(e.KeyCode)} 누름",
-      MacroEventType.KeyUp      => $"{EventDisplay.KeyName(e.KeyCode)} 뗌",
+      MacroEventType.MouseClick => $"{Source.Button} {(Source.ClickType == ClickType.Double ? "더블클릭" : "클릭")}",
+      MacroEventType.KeyDown    => $"{EventDisplay.KeyName(Source.KeyCode)} 누름",
+      MacroEventType.KeyUp      => $"{EventDisplay.KeyName(Source.KeyCode)} 뗌",
+      MacroEventType.Empty      => "",
       _                         => "?",
     };
-    X       = e.X;
-    Y       = e.Y;
+    X = Source.EventType == MacroEventType.Empty ? "" : Source.X.ToString();
+    Y = Source.EventType == MacroEventType.Empty ? "" : Source.Y.ToString();
   }
 
   public event PropertyChangedEventHandler? PropertyChanged;
@@ -162,6 +180,9 @@ public class MainViewModel : INotifyPropertyChanged
   private readonly System.Windows.Threading.DispatcherTimer _captureFinalizeTimer =
     new() { Interval = TimeSpan.FromMilliseconds(500) };
 
+  // '기록된 이벤트' 목록의 복사/붙여넣기용 클립보드(단일 슬롯)
+  private MacroEvent? _copiedMacroEvent;
+
   public ObservableCollection<Macro>        Macros        { get; } = new();
   public ObservableCollection<MacroEventRow> CurrentEvents { get; } = new();
 
@@ -242,6 +263,13 @@ public class MainViewModel : INotifyPropertyChanged
   }
 
   public bool IsRepeatCountEnabled => !IsInfiniteRepeat;
+
+  private MacroEventRow? _selectedEventRow;
+  public MacroEventRow? SelectedEventRow
+  {
+    get => _selectedEventRow;
+    set { _selectedEventRow = value; OnPropertyChanged(); RaiseAllCommands(); }
+  }
 
   public string EstimatedDurationText =>
     FormatDuration(_selectedMacro?.Events.Sum(e => e.DelayMs) ?? 0);
@@ -360,6 +388,10 @@ public class MainViewModel : INotifyPropertyChanged
   public ICommand StopCommand    { get; }
   public ICommand PlayCommand    { get; }
   public ICommand NewMacroCommand  { get; }
+  public ICommand AddEventCommand    { get; }
+  public ICommand CopyEventCommand   { get; }
+  public ICommand PasteEventCommand  { get; }
+  public ICommand DeleteEventCommand { get; }
   public ICommand DeleteCommand  { get; }
   public ICommand DuplicateCommand { get; }
   public ICommand MoveMacroUpCommand   { get; }
@@ -391,6 +423,10 @@ public class MainViewModel : INotifyPropertyChanged
     StopCommand     = new RelayCommand(_ => Stop(removeLastEvent: true), _ => _state != AppState.Idle);
     PlayCommand     = new AsyncRelayCommand(_ => StartPlayingAsync(), _ => _state == AppState.Idle && _selectedMacro?.Events.Count > 0);
     NewMacroCommand = new RelayCommand(_ => CreateNewMacro(), _ => _state == AppState.Idle);
+    AddEventCommand    = new RelayCommand(_ => InsertBlankEvent(),     _ => _state == AppState.Idle && _selectedMacro != null);
+    CopyEventCommand   = new RelayCommand(_ => CopySelectedEvent(),    _ => _state == AppState.Idle && _selectedEventRow != null);
+    PasteEventCommand  = new RelayCommand(_ => PasteIntoSelectedEvent(), _ => _state == AppState.Idle && _selectedEventRow != null && _copiedMacroEvent != null);
+    DeleteEventCommand = new RelayCommand(_ => DeleteSelectedEvent(),  _ => _state == AppState.Idle && _selectedEventRow != null);
     DeleteCommand   = new RelayCommand(_ => DeleteSelected(),   _ => _state == AppState.Idle && _selectedMacros.Count > 0);
     DuplicateCommand = new RelayCommand(_ => DuplicateSelected(), _ => _state == AppState.Idle && _selectedMacros.Count > 0);
     MoveMacroUpCommand   = new RelayCommand(_ => MoveMacro(-1), _ => _state == AppState.Idle && _selectedMacro != null && Macros.IndexOf(_selectedMacro) > 0);
@@ -540,6 +576,13 @@ public class MainViewModel : INotifyPropertyChanged
     if (_selectedMacro == null || _selectedMacro.Events.Count == 0) return;
     if (_state != AppState.Idle) return;
 
+    if (_selectedMacro.Events.Any(e => e.EventType == MacroEventType.Empty))
+    {
+      MessageBox.Show("빈 이벤트가 있습니다. 삭제하거나 복사·붙여넣기로 채운 뒤 다시 시도하세요.",
+        "재생 불가", MessageBoxButton.OK, MessageBoxImage.Warning);
+      return;
+    }
+
     SetState(AppState.Playing);
 
     long runDurationMs = _selectedMacro.Events.Sum(e => e.DelayMs);
@@ -593,6 +636,19 @@ public class MainViewModel : INotifyPropertyChanged
     if (missing.Count > 0)
     {
       MessageBox.Show($"다음 기본 매크로를 찾을 수 없어 실행할 수 없습니다: {string.Join(", ", missing)}",
+        "실행 불가", MessageBoxButton.OK, MessageBoxImage.Error);
+      return;
+    }
+
+    var emptyEventMacros = _selectedComposite.Steps
+      .Where(s => s.StepType == CompositeStepType.MacroRef)
+      .Select(s => s.MacroName)
+      .Distinct()
+      .Where(n => ResolveMacroByName(n)?.Events.Any(e => e.EventType == MacroEventType.Empty) == true)
+      .ToList();
+    if (emptyEventMacros.Count > 0)
+    {
+      MessageBox.Show($"다음 기본 매크로에 빈 이벤트가 있어 실행할 수 없습니다: {string.Join(", ", emptyEventMacros)}",
         "실행 불가", MessageBoxButton.OK, MessageBoxImage.Error);
       return;
     }
@@ -824,6 +880,57 @@ public class MainViewModel : INotifyPropertyChanged
     });
   }
 
+  // '추가' 버튼: 선택된 행 바로 다음(선택 없으면 맨 끝)에 값이 빈 이벤트를 삽입한다.
+  // 종류/X/Y는 읽기 전용 컬럼이라 직접 입력할 수 없으므로, 기존 행을 복사해 붙여넣어 채우는 용도다.
+  private void InsertBlankEvent()
+  {
+    if (_selectedMacro == null) return;
+    int insertIdx = _selectedEventRow != null
+      ? _selectedMacro.Events.IndexOf(_selectedEventRow.Source) + 1
+      : _selectedMacro.Events.Count;
+    _selectedMacro.Events.Insert(insertIdx, new MacroEvent { EventType = MacroEventType.Empty });
+    RefreshEventList();
+    SelectedEventRow = CurrentEvents[insertIdx];
+    OnPropertyChanged(nameof(EstimatedDurationText));
+    _ = SaveAsync();
+  }
+
+  private void CopySelectedEvent()
+  {
+    if (_selectedEventRow == null) return;
+    var s = _selectedEventRow.Source;
+    _copiedMacroEvent = new MacroEvent
+    {
+      EventType = s.EventType, Button = s.Button, ClickType = s.ClickType,
+      X = s.X, Y = s.Y, KeyCode = s.KeyCode, DelayMs = s.DelayMs
+    };
+  }
+
+  private void PasteIntoSelectedEvent()
+  {
+    if (_selectedEventRow == null || _copiedMacroEvent == null) return;
+    var target = _selectedEventRow.Source;
+    var c = _copiedMacroEvent;
+    target.EventType = c.EventType;
+    target.Button    = c.Button;
+    target.ClickType = c.ClickType;
+    target.X         = c.X;
+    target.Y         = c.Y;
+    target.KeyCode   = c.KeyCode;
+    target.DelayMs   = c.DelayMs;
+    _selectedEventRow.Refresh(); // Kind/X/Y/Delay 표시 갱신 → Delay 변경 통지로 저장까지 이어진다
+  }
+
+  private void DeleteSelectedEvent()
+  {
+    if (_selectedMacro == null || _selectedEventRow == null) return;
+    _selectedMacro.Events.Remove(_selectedEventRow.Source);
+    _selectedEventRow = null;
+    RefreshEventList();
+    OnPropertyChanged(nameof(EstimatedDurationText));
+    _ = SaveAsync();
+  }
+
   private void RefreshEventList()
   {
     CurrentEvents.Clear();
@@ -1001,6 +1108,10 @@ public class MainViewModel : INotifyPropertyChanged
     ((RelayCommand)StopCommand).RaiseCanExecuteChanged();
     ((AsyncRelayCommand)PlayCommand).RaiseCanExecuteChanged();
     ((RelayCommand)NewMacroCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)AddEventCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)CopyEventCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)PasteEventCommand).RaiseCanExecuteChanged();
+    ((RelayCommand)DeleteEventCommand).RaiseCanExecuteChanged();
     ((RelayCommand)DeleteCommand).RaiseCanExecuteChanged();
     ((RelayCommand)DuplicateCommand).RaiseCanExecuteChanged();
     ((RelayCommand)MoveMacroUpCommand).RaiseCanExecuteChanged();
