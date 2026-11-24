@@ -52,7 +52,7 @@ dotnet run
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
 ```
 
-결과물은 `publish\AutoClicker.exe`입니다. `publish` 폴더에 `.dll` 파일이 함께 생성되면 exe와 같은 폴더에 두고 실행하세요.
+결과물은 `publish\AutoClicker.exe`입니다. 다른 PC로 옮길 때는 함께 생성된 `.dll` 파일도 exe와 같은 폴더에 복사하세요.
 
 ## 사용법
 
