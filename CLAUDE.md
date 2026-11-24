@@ -45,7 +45,8 @@ Models (Macro, MacroEvent)
 ### 핵심 서비스
 
 **MouseHookService** — `SetWindowsHookEx(WH_MOUSE_LL)`로 저수준 마우스 후킹.  
-더블클릭은 OS 더블클릭 타임 내 같은 좌표 클릭을 감지해 마지막 이벤트를 Single→Double로 교체한다 (`LastEventReplace` 이벤트).
+더블클릭은 `WM_LBUTTONDBLCLK`/`WM_RBUTTONDBLCLK` 수신 시 마지막 이벤트를 Single→Double로 교체하도록 구현되어 있다 (`LastEventReplace` 이벤트). 시간·좌표를 비교하는 로직은 없다.  
+단, `WH_MOUSE_LL`에는 이 메시지가 전달되지 않으므로 더블클릭은 Single 클릭 2개로 녹화되고, 재생 시 녹화된 간격대로 두 번 클릭한다. 게임에서는 실제 간격을 재현하는 편이 안전하므로 의도적으로 유지한다.
 
 **MacroPlayerService** — `SendInput` API로 마우스 조작. 좌표는 물리 픽셀에서 정규화 좌표(0~65535)로 변환하며, 다중 모니터를 위해 가상 데스크탑 전체 크기(`SM_CXVIRTUALSCREEN`)를 기준으로 한다.
 
